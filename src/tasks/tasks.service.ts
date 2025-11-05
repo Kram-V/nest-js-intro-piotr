@@ -1,29 +1,58 @@
 import { Injectable } from '@nestjs/common';
-import { ITask } from './task.model';
+import { TaskStatus } from './task.model';
 import { CreateTaskDto } from './dtos/create-task.dto';
+import { UpdateTaskDto } from './dtos/update-task.dto';
+import { WrongTaskStatusException } from './exceptions/wrong-task-status.exception';
+import { Repository } from 'typeorm';
+import { Task } from './task.entity';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class TasksService {
-  private tasks: ITask[] = [];
+  constructor(
+    @InjectRepository(Task)
+    private readonly tasksRepository: Repository<Task>,
+  ) {}
 
-  public findAll(): ITask[] {
-    return this.tasks;
+  public async findAll(): Promise<Task[]> {
+    return await this.tasksRepository.find();
   }
 
-  public findOne(id: number): ITask | undefined {
-    return this.tasks.find((task) => task.id === id);
+  public async findOne(id: string): Promise<Task | null> {
+    return await this.tasksRepository.findOneBy({ id });
   }
 
-  public create(createTaskDto: CreateTaskDto): ITask {
-    const task: ITask = {
-      id: Date.now(),
-      ...createTaskDto,
-    };
+  public async create(createTaskDto: CreateTaskDto): Promise<Task> {
+    return await this.tasksRepository.save(createTaskDto);
+  }
 
-    this.tasks = [task, ...this.tasks];
+  public async update(task: Task, updateTaskDto: UpdateTaskDto): Promise<Task> {
+    if (
+      updateTaskDto?.status &&
+      !this.isValidStatusTransition(task.status, updateTaskDto.status)
+    ) {
+      throw new WrongTaskStatusException();
+    }
 
-    console.log(this.tasks);
+    Object.assign(task, updateTaskDto);
 
-    return task;
+    return await this.tasksRepository.save(task);
+  }
+
+  public async delete(task: Task): Promise<void> {
+    await this.tasksRepository.delete(task);
+  }
+
+  private isValidStatusTransition(
+    currentStatus: TaskStatus,
+    newStatus: TaskStatus,
+  ): boolean {
+    const statusOrder: TaskStatus[] = [
+      TaskStatus.OPEN,
+      TaskStatus.IN_PROGRESS,
+      TaskStatus.DONE,
+    ];
+
+    return statusOrder.indexOf(currentStatus) <= statusOrder.indexOf(newStatus);
   }
 }

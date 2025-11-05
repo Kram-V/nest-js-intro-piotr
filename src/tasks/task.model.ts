@@ -1,12 +1,5 @@
-export interface ITask {
-  id: number;
-  title: string;
-  description: string;
-  status: TaskStatus;
-}
-
 export enum TaskStatus {
   OPEN = 'OPEN',
-  IN_PROGRESS = 'IN_PROGRESS',
+  IN_PROGRESS = 'IN PROGRESS',
   DONE = 'DONE',
 }
