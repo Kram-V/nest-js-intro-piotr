@@ -9,6 +9,8 @@ import { dbConfig } from './config/db.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TypedConfigService } from './config/typed-config.service';
 import { Task } from './tasks/task.entity';
+import { User } from './users/user.entity';
+import { TaskLabel } from './tasks/task-label.entity';
 
 @Module({
   imports: [
@@ -17,7 +19,7 @@ import { Task } from './tasks/task.entity';
       inject: [ConfigService],
       useFactory: (configService: TypedConfigService) => {
         const dbConfig = configService.get('dbConfig', { infer: true });
-        return { ...dbConfig, entities: [Task] };
+        return { ...dbConfig, entities: [Task, User, TaskLabel] };
       },
     }),
     ConfigModule.forRoot({

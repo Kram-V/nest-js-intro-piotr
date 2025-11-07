@@ -6,12 +6,17 @@ import { WrongTaskStatusException } from './exceptions/wrong-task-status.excepti
 import { Repository } from 'typeorm';
 import { Task } from './task.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CreateTaskLabelDto } from './dtos/create-task-label.dto';
+import { TaskLabel } from './task-label.entity';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectRepository(Task)
     private readonly tasksRepository: Repository<Task>,
+
+    @InjectRepository(TaskLabel)
+    private readonly taskLabelsRepository: Repository<TaskLabel>,
   ) {}
 
   public async findAll(): Promise<Task[]> {
@@ -19,14 +24,46 @@ export class TasksService {
   }
 
   public async findOne(id: string): Promise<Task | null> {
-    return await this.tasksRepository.findOneBy({ id });
+    return await this.tasksRepository.findOne({
+      where: {
+        id,
+      },
+      relations: ['labels'],
+    });
   }
 
   public async create(createTaskDto: CreateTaskDto): Promise<Task> {
+    if (createTaskDto.labels) {
+      createTaskDto.labels = this.getUniqueLabels(createTaskDto.labels);
+    }
+
     return await this.tasksRepository.save(createTaskDto);
   }
 
+  public async createLabels(
+    task: Task,
+    labelDtos: CreateTaskLabelDto[],
+  ): Promise<Task> {
+    const names = new Set(task.labels.map((label) => label.name));
+
+    const instanceOfLabels = this.getUniqueLabels(labelDtos)
+      .filter((label) => !names.has(label.name))
+      .map((label) => this.taskLabelsRepository.create(label));
+
+    if (instanceOfLabels.length) {
+      task.labels = [...task.labels, ...instanceOfLabels];
+
+      return await this.tasksRepository.save(task);
+    }
+
+    return task;
+  }
+
   public async update(task: Task, updateTaskDto: UpdateTaskDto): Promise<Task> {
+    if (updateTaskDto.labels) {
+      updateTaskDto.labels = this.getUniqueLabels(updateTaskDto.labels);
+    }
+
     if (
       updateTaskDto?.status &&
       !this.isValidStatusTransition(task.status, updateTaskDto.status)
@@ -40,7 +77,17 @@ export class TasksService {
   }
 
   public async delete(task: Task): Promise<void> {
-    await this.tasksRepository.delete(task);
+    // BEFORE
+    // await this.tasksRepository.delete(task);
+
+    // AFTER
+    await this.tasksRepository.delete(task.id);
+  }
+
+  public async deleteLabels(task: Task, labels: string[]): Promise<Task> {
+    task.labels = task.labels.filter((label) => !labels.includes(label.name));
+
+    return await this.tasksRepository.save(task);
   }
 
   private isValidStatusTransition(
@@ -54,5 +101,13 @@ export class TasksService {
     ];
 
     return statusOrder.indexOf(currentStatus) <= statusOrder.indexOf(newStatus);
+  }
+
+  private getUniqueLabels(
+    labelDtos: CreateTaskLabelDto[],
+  ): CreateTaskLabelDto[] {
+    const uniqueNames = [...new Set(labelDtos.map((label) => label.name))];
+
+    return uniqueNames.map((name) => ({ name }));
   }
 }
