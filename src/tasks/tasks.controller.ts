@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dtos/create-task.dto';
@@ -18,14 +19,32 @@ import { UpdateTaskDto } from './dtos/update-task.dto';
 import { WrongTaskStatusException } from './exceptions/wrong-task-status.exception';
 import { Task } from './task.entity';
 import { CreateTaskLabelDto } from './dtos/create-task-label.dto';
+import { FindTaskParams } from './params/find-task.params';
+import { PaginationParams } from 'src/common/pagination.params';
+import { PaginationResponse } from 'src/common/pagination.response';
 
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  public async findAll(): Promise<Task[]> {
-    return await this.tasksService.findAll();
+  public async findAll(
+    @Query() filters: FindTaskParams,
+    @Query() paginationParams: PaginationParams,
+  ): Promise<PaginationResponse<Task>> {
+    const [items, total] = await this.tasksService.findAll(
+      filters,
+      paginationParams,
+    );
+
+    return {
+      data: items,
+      meta: {
+        total,
+        offset: paginationParams.offset,
+        limit: paginationParams.limit,
+      },
+    };
   }
 
   @Get(':id')

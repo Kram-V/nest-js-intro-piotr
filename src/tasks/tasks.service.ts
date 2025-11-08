@@ -8,6 +8,8 @@ import { Task } from './task.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateTaskLabelDto } from './dtos/create-task-label.dto';
 import { TaskLabel } from './task-label.entity';
+import { FindTaskParams } from './params/find-task.params';
+import { PaginationParams } from 'src/common/pagination.params';
 
 @Injectable()
 export class TasksService {
@@ -19,8 +21,18 @@ export class TasksService {
     private readonly taskLabelsRepository: Repository<TaskLabel>,
   ) {}
 
-  public async findAll(): Promise<Task[]> {
-    return await this.tasksRepository.find();
+  public async findAll(
+    filters: FindTaskParams,
+    pagination: PaginationParams,
+  ): Promise<[Task[], number]> {
+    return await this.tasksRepository.findAndCount({
+      where: {
+        status: filters.status,
+      },
+      relations: ['labels'],
+      skip: pagination.offset,
+      take: pagination.limit,
+    });
   }
 
   public async findOne(id: string): Promise<Task | null> {
@@ -84,8 +96,10 @@ export class TasksService {
     await this.tasksRepository.delete(task.id);
   }
 
-  public async deleteLabels(task: Task, labels: string[]): Promise<Task> {
-    task.labels = task.labels.filter((label) => !labels.includes(label.name));
+  public async deleteLabels(task: Task, labelNames: string[]): Promise<Task> {
+    task.labels = task.labels.filter(
+      (label) => !labelNames.includes(label.name),
+    );
 
     return await this.tasksRepository.save(task);
   }
